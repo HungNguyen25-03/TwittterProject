@@ -5,34 +5,23 @@ import userService from '~/services/users.services'
 import { ParamsDictionary } from 'express-serve-static-core'
 import { RegisterReqBody } from '~/models/requests/user.request'
 
-export const loginController = (req: Request, res: Response) => {
-  const { email, password } = req.body
-  if (email === 'test@gmail.com' && password === '123456') {
-    return res.json({
-      message: 'login successfilly',
-      data: [
-        { fname: 'Điệp', yob: 1999 },
-        { fname: 'Hùng', yob: 2003 },
-        { fname: 'Được', yob: 1994 }
-      ]
-    })
-  }
-  return res.status(400).json({
-    error: 'login failed'
+export const loginController = async (req: Request, res: Response) => {
+  //lấy user_id từ user của req
+  const { user }: any = req
+  const user_id = user._id
+  //dùng user_id tạo access_token và refesh_token
+  const result = await userService.login(user_id.toString())
+  //respone về access_token và refresh_token cho client
+  res.json({
+    message: 'login successful',
+    result
   })
 }
 
 export const registerController = async (req: Request<ParamsDictionary, any, RegisterReqBody>, res: Response) => {
-  try {
-    const result = await userService.register(req.body)
-    res.json({
-      message: 'register successful',
-      result
-    })
-  } catch (error) {
-    res.status(400).json({
-      message: 'register failed',
-      error
-    })
-  }
+  const result = await userService.register(req.body)
+  res.json({
+    message: 'register successful',
+    result
+  })
 }
