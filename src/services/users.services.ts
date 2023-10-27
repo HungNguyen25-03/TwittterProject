@@ -5,6 +5,9 @@ import { hashPassword } from '~/utils/crypto'
 import { signToken } from '~/utils/jwt'
 import { TokenType } from '~/constants/enums'
 import { config } from 'dotenv'
+import { ObjectId } from 'mongodb'
+import RefreshToken from '~/models/schema/RefreshToken.schema'
+import { USERS_MESSAGES } from '~/constants/messages'
 config()
 
 class UsersService {
@@ -39,6 +42,13 @@ class UsersService {
     const user_id = result.insertedId.toString()
     //từ user_id tạo ra 1 accessToken và 1 refresh token
     const [access_token, refresh_token] = await this.signAccessAndRefreshToken(user_id)
+    //lưu refresh token vào db
+    await databaseService.refreshTokens.insertOne(
+      new RefreshToken({
+        token: refresh_token,
+        user_id: new ObjectId(user_id)
+      })
+    )
     return { access_token, refresh_token }
   }
 
@@ -50,7 +60,22 @@ class UsersService {
 
   async login(user_id: string) {
     const [access_token, refresh_token] = await this.signAccessAndRefreshToken(user_id)
+    //lưu refresh token vào db
+    await databaseService.refreshTokens.insertOne(
+      new RefreshToken({
+        token: refresh_token,
+        user_id: new ObjectId(user_id)
+      })
+    )
     return { access_token, refresh_token }
+  }
+
+  async logout(refresh_token: string) {
+    //dùng refresh_token tìm và xóa
+    await databaseService.refreshTokens.deleteOne({ token: refresh_token })
+    return {
+      message: USERS_MESSAGES.LOGOUT_SUCCESS
+    }
   }
 }
 const userService = new UsersService()
