@@ -2,16 +2,21 @@
 import { Router } from 'express'
 import {
   emailVerifyTokenController,
+  forgotPasswordController,
   loginController,
   logoutController,
-  registerController
+  registerController,
+  resendEmailVerifyController,
+  verifyForgotPasswordTokenController
 } from '~/controllers/users.controller'
 import {
   accessTokenValidator,
   emailVerifyTokenValidator,
+  forgotPasswordValidator,
   loginValidator,
   refreshTokenValidator,
-  registerValidator
+  registerValidator,
+  verifyForgotPasswordTokenValidator
 } from '~/middlewares/users.middewares'
 import { wrapAsync } from '~/utils/handlers'
 const usersRouter = Router()
@@ -49,6 +54,41 @@ method: POST
 body: {email_verify_token: string}
 */
 usersRouter.post('/verify-email', emailVerifyTokenValidator, wrapAsync(emailVerifyTokenController))
+
+/*
+des: resend email verify token
+khi email thất lạc, hoặc cái email_verify_token hết hạn, thì người dùng có nhu cầu resend email_verify_token
+
+method: post
+path: /users/resend-verify-email
+headers: {Authorization: Bearer <access_token>} //đăng nhập mới cho resend email verify
+body: {}
+*/
+usersRouter.post('/resend-verify-email', accessTokenValidator, wrapAsync(resendEmailVerifyController))
+
+/*
+des: khi người dùng quên mật khẩu , họ gửi email để xin mình tạo cho họ forgot_password_token
+path: /forgot-password
+method: POST
+Header: không cần, vì  ngta quên mật khẩu rồi, thì sao mà đăng nhập để có authen đc
+body: {email: string}
+*/
+usersRouter.post('/forgot-password', forgotPasswordValidator, wrapAsync(forgotPasswordController))
+
+/*
+des: khi người dùng nhấp vào link trong email để reset password
+họ sẽ gửi 1 req kèm theo forgot-password_token lên server
+server sẽ ktr forrgot-password có hơp lệ hay không
+path: /verify-forgot-password
+method: POST
+Header: không cần, vì  ngta quên mật khẩu rồi, thì sao mà đăng nhập để có authen đc
+body: {forgot_password_token: string}
+*/
+usersRouter.post(
+  '/verify-forgot-password',
+  verifyForgotPasswordTokenValidator,
+  wrapAsync(verifyForgotPasswordTokenController)
+)
 
 export default usersRouter
 
