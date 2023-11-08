@@ -142,4 +142,6 @@ dist
 # SvelteKit build / generate output
 .svelte-kit
 
+client_secret_120116666029-nrc04r0l2g7g04tqh818ilu79iqaoa83.apps.googleusercontent.com.json
+
 # End of https://www.toptal.com/developers/gitignore/api/node
