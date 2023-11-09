@@ -3,7 +3,7 @@ import User from '~/models/schema/User.schema'
 import databaseService from './database.services'
 import { RegisterReqBody, TokenPayload, UpdateMeReqBody } from '~/models/requests/user.request'
 import { hashPassword } from '~/utils/crypto'
-import { signToken } from '~/utils/jwt'
+import { signToken, verifyToken } from '~/utils/jwt'
 import { TokenType, UserVerifyStatus } from '~/constants/enums'
 import { config } from 'dotenv'
 import { ObjectId } from 'mongodb'
@@ -15,6 +15,14 @@ import axios from 'axios'
 config()
 
 class UsersService {
+  private decodeRefreshToken(refresh_token: string) {
+    //hàm nhận vào token và secretOrPublicKey sẽ return về payload
+    return verifyToken({
+      token: refresh_token,
+      secretOrPublickey: process.env.JWT_SECRET_REFRESH_TOKEN as string
+    })
+  }
+
   private signAccessToken({ user_id, verify }: { user_id: string; verify: UserVerifyStatus }) {
     return signToken({
       payload: { user_id, token_type: TokenType.AccessToken, verify },
@@ -23,12 +31,19 @@ class UsersService {
     })
   }
 
-  private signRefreshToken({ user_id, verify }: { user_id: string; verify: UserVerifyStatus }) {
-    return signToken({
-      payload: { user_id, token_type: TokenType.RefreshToken, verify },
-      options: { expiresIn: process.env.REFRESH_TOKEN_EXPIRE_IN },
-      privateKey: process.env.JWT_SECRET_REFRESH_TOKEN as string
-    })
+  private signRefreshToken({ user_id, verify, exp }: { user_id: string; verify: UserVerifyStatus; exp?: number }) {
+    if (exp) {
+      return signToken({
+        payload: { user_id, token_type: TokenType.RefreshToken, verify, exp },
+        privateKey: process.env.JWT_SECRET_REFRESH_TOKEN as string
+      })
+    } else {
+      return signToken({
+        payload: { user_id, token_type: TokenType.RefreshToken, verify },
+        options: { expiresIn: process.env.REFRESH_TOKEN_EXPIRE_IN },
+        privateKey: process.env.JWT_SECRET_REFRESH_TOKEN as string
+      })
+    }
   }
 
   //hàm sign email_verify_token
@@ -60,6 +75,7 @@ class UsersService {
       user_id: user_id.toString(),
       verify: UserVerifyStatus.Unverified
     })
+
     const result = await databaseService.users.insertOne(
       new User({
         ...payload,
@@ -76,11 +92,15 @@ class UsersService {
       user_id: user_id.toString(),
       verify: UserVerifyStatus.Unverified //0
     })
+    //decode refresh_token để láy exp, iat
+    const { exp, iat } = await this.decodeRefreshToken(refresh_token)
     //lưu refresh token vào db
     await databaseService.refreshTokens.insertOne(
       new RefreshToken({
         token: refresh_token,
-        user_id: new ObjectId(user_id)
+        user_id: new ObjectId(user_id),
+        exp,
+        iat
       })
     )
 
@@ -100,11 +120,16 @@ class UsersService {
       user_id,
       verify
     })
+    //decode refresh_token để láy exp, iat
+    const { exp, iat } = await this.decodeRefreshToken(refresh_token)
+
     //lưu refresh token vào db
     await databaseService.refreshTokens.insertOne(
       new RefreshToken({
         token: refresh_token,
-        user_id: new ObjectId(user_id)
+        user_id: new ObjectId(user_id),
+        exp,
+        iat
       })
     )
     return { access_token, refresh_token }
@@ -134,11 +159,15 @@ class UsersService {
       user_id,
       verify: UserVerifyStatus.Verified
     })
+    //decode refresh_token để láy exp, iat
+    const { exp, iat } = await this.decodeRefreshToken(refresh_token)
     //lưu refresh_token vào db
     await databaseService.refreshTokens.insertOne(
       new RefreshToken({
         token: refresh_token,
-        user_id: new ObjectId(user_id)
+        user_id: new ObjectId(user_id),
+        exp,
+        iat
       })
     )
     return { access_token, refresh_token }
@@ -335,19 +364,28 @@ class UsersService {
   async refreshToken({
     user_id,
     verify,
-    refresh_token
+    refresh_token,
+    exp
   }: {
     user_id: string
     verify: UserVerifyStatus
     refresh_token: string
+    exp: number
   }) {
     //tạo ra access_token mới và refresh_token mới
-    const [access_token, new_refresh_token] = await this.signAccessAndRefreshToken({ user_id, verify })
+    const [access_token, new_refresh_token] = await Promise.all([
+      this.signAccessToken({ user_id, verify }),
+      this.signRefreshToken({ user_id, verify, exp })
+    ])
+    //decode refresh_token để láy exp, iat
+    const { iat } = await this.decodeRefreshToken(new_refresh_token)
     await databaseService.refreshTokens.deleteOne({ token: refresh_token })
     await databaseService.refreshTokens.insertOne(
       new RefreshToken({
         token: new_refresh_token,
-        user_id: new ObjectId(user_id)
+        user_id: new ObjectId(user_id),
+        exp,
+        iat
       })
     )
     return {
@@ -417,11 +455,15 @@ class UsersService {
         user_id: user._id.toString(),
         verify: user.verify
       })
+      //decode refresh_token để láy exp, iat
+      const { exp, iat } = await this.decodeRefreshToken(refresh_token)
       //lưu refresh token vào db
       await databaseService.refreshTokens.insertOne(
         new RefreshToken({
           token: refresh_token,
-          user_id: new ObjectId(user._id)
+          user_id: new ObjectId(user._id),
+          exp,
+          iat
         })
       )
       return {

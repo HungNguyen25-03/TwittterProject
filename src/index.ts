@@ -5,19 +5,19 @@ import { defaultErrorHandler } from './middlewares/error.middewares'
 import mediaRouter from './routes/medias.routes'
 import { initFolder } from './utils/flie'
 import { config } from 'dotenv'
-import argv from 'minimist'
-import { UPLOAD_DIR } from './constants/dir'
 import staticRouter from './routes/static.routes'
+import { UPLOAD_VIDEO_DIR } from './constants/dir'
+import { MongoClient } from 'mongodb'
 config()
-
-const options = argv(process.argv.slice(2))
 
 const app = express()
 app.use(express.json())
 const port = process.env.PORT || 4000
 initFolder()
 
-databaseService.connect()
+databaseService.connect().then(() => {
+  databaseService.indexUsers()
+})
 
 app.get('/', (req, res) => {
   res.send('hello world')
@@ -27,6 +27,7 @@ app.use('/users', usersRouter)
 app.use('/medias', mediaRouter)
 // app.use('/static', express.static(UPLOAD_DIR))
 app.use('/static', staticRouter)
+// app.use('/static/video', express.static(UPLOAD_VIDEO_DIR))
 //localhost:3000/users/tweets
 
 app.use(defaultErrorHandler)
