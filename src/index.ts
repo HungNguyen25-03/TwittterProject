@@ -8,6 +8,7 @@ import { config } from 'dotenv'
 import staticRouter from './routes/static.routes'
 import { UPLOAD_VIDEO_DIR } from './constants/dir'
 import { MongoClient } from 'mongodb'
+import tweetRouter from './routes/tweet.routes'
 config()
 
 const app = express()
@@ -17,6 +18,8 @@ initFolder()
 
 databaseService.connect().then(() => {
   databaseService.indexUsers()
+  databaseService.indexRefreshTokens()
+  databaseService.indexFollowers()
 })
 
 app.get('/', (req, res) => {
@@ -25,6 +28,7 @@ app.get('/', (req, res) => {
 //usersRouter sử dụng 1 middleware
 app.use('/users', usersRouter)
 app.use('/medias', mediaRouter)
+app.use('/tweets', tweetRouter)
 // app.use('/static', express.static(UPLOAD_DIR))
 app.use('/static', staticRouter)
 // app.use('/static/video', express.static(UPLOAD_VIDEO_DIR))
